@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sports Guide Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee; padding: 1em; }
+    h1, h2 { color: #4dd0e1; }
+    .sport { margin-bottom: 2em; }
+    .item { margin-left: 1em; }
+  </style>
+</head>
+<body>
+  <h1>Sports Guide (Next 12 Hours)</h1>
+  <div id="output">Loading…</div>
+  <script>
+    const DVR_IP = "192.168.86.72";
+    const DURATION = 720;
+    const CATS = ["sports", "sports non-event"];
+    const KEYS = ["nfl","mlb","nba","nhl","soccer","tennis","golf","basketball","football","boxing","ufc"];
+    fetch(`http://${DVR_IP}:8089/devices/ANY/guide?duration=${DURATION}`)
+      .then(r => r.json())
+      .then(data => {
+        const grouped = {};
+        data.forEach(ch => {
+          const channel = ch.Channel?.Name || "Unknown";
+          const number = ch.Channel?.Number || "?";
+          (ch.Airings || []).forEach(a => {
+            const cats = (a.Categories || []).map(x => x.toLowerCase());
+            const gens = (a.Genres || []).map(x => x.toLowerCase());
+            const t = (a.Title || "").toLowerCase();
+            const s = (a.Summary || "").toLowerCase();
+            const isSport = cats.some(c => CATS.includes(c)) ||
+                            gens.some(g => KEYS.includes(g)) ||
+                            KEYS.some(k => t.includes(k) || s.includes(k));
+            if (!isSport) return;
+            const sport = gens.find(g => KEYS.includes(g)) || "Other";
+            const time = new Date(a.Time * 1000)
+                         .toLocaleTimeString([], {hour: 'numeric',minute: '2-digit'});
+            const line = `• ${a.Title} — ${channel} (Ch. ${number}) — ${time}`;
+            (grouped[sport] = grouped[sport] || []).push(line);
+          });
+        });
+        const out = document.getElementById("output");
+        out.innerHTML = Object.keys(grouped).length
+          ? Object.entries(grouped).map(([sport, list]) =>
+              `<div class="sport"><h2>${sport.toUpperCase()}</h2>` +
+              `${list.map(i => `<div class="item">${i}</div>`).join('')}</div>`
+            ).join('')
+          : "<p>No sports airing in the next 12 hours.</p>";
+      })
+      .catch(err => {
+        document.getElementById("output")
+                .innerText = "Error loading data: " + err;
+      });
+  </script>
+</body>
+</html>
